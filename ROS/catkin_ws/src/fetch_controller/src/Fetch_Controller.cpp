@@ -1,4 +1,5 @@
 #include "Fetch_Controller.hpp"
+#include <limits>
 
 Fetch_Controller::Fetch_Controller(ros::NodeHandle &nh)
 {
@@ -6,7 +7,8 @@ Fetch_Controller::Fetch_Controller(ros::NodeHandle &nh)
 
     //TODO: initialize a subscriber that is set to the channel "/base_scan". Set its callback function to be Laser_Scan_Callback
     //TODO: initialize a publisher that is set to the channel "/cmd_vel"
-
+    subscriber_ = nh_.subscribe("/base_scan", 1000, &Fetch_Controller::Laser_Scan_Callback, this);
+    publisher_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000, this);
 
 }
 
@@ -19,5 +21,27 @@ void Fetch_Controller::Laser_Scan_Callback(const sensor_msgs::LaserScan::ConstPt
     If the minimum scan in this direction is greater than 1m, drive forward. 
     Otherwise, turn left. 
     */
+   int size = msg_laser_scan->ranges.size();
+   std::vector<float> scan = msg_laser_scan->ranges;
 
+   geometry_msgs::Twist msg;
+
+   int min = std::numeric_limits<int>::max();
+   int min_index = -1;
+
+
+   for (int i = (size/2) - 60; i < (size/2) + 60; ++i) {
+        if ((scan[i] <= min) && (scan[i] >= msg_laser_scan->range_min) && (scan[i] <= msg_laser_scan->range_max)) {
+            min = scan[i];
+            min_index = i;
+        }
+   }
+
+   if (min > 1) { // greater than 1m, linear velocity of 0.5 m/s forward
+        msg.linear.x = 0.5;
+   }
+   else { // otherwise, angular velocity of 1.0 radians/s, turning the robot to its left
+        msg.angular.z = 1;
+   }
+   publisher_.publish(msg);
 }
